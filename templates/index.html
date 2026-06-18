@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ayan's Emotion Detector 💕</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    header h1 {
+      font-size: 2.2rem;
+      background: linear-gradient(90deg, #fd79a8, #a29bfe, #74b9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    header p {
+      font-size: 0.95rem;
+      color: #a29bfe;
+      margin-top: 6px;
+    }
+
+    /* ── Main layout ── */
+    .main {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 1100px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    /* ── Camera card ── */
+    .camera-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+      flex: 0 0 auto;
+    }
+    .camera-card img {
+      display: block;
+      width: 560px;
+      max-width: 100%;
+      border-radius: 20px;
+    }
+    .cam-label {
+      text-align: center;
+      padding: 10px;
+      font-size: 0.8rem;
+      color: #a29bfe;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* ── Info panel ── */
+    .info-panel {
+      flex: 1;
+      min-width: 280px;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Emotion card ── */
+    .emotion-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      text-align: center;
+      transition: border-color 0.5s;
+    }
+    .emotion-emoji {
+      font-size: 4rem;
+      display: block;
+      margin-bottom: 8px;
+      filter: drop-shadow(0 0 12px currentColor);
+    }
+    .emotion-label {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      transition: color 0.5s;
+    }
+    .confidence-bar-wrap {
+      background: rgba(255,255,255,0.1);
+      border-radius: 999px;
+      height: 8px;
+      margin: 12px 0 4px;
+      overflow: hidden;
+    }
+    .confidence-bar {
+      height: 100%;
+      border-radius: 999px;
+      width: 0%;
+      transition: width 0.6s ease, background 0.5s;
+    }
+    .confidence-text {
+      font-size: 0.8rem;
+      color: #dfe6e9;
+    }
+
+    /* ── Message card ── */
+    .message-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 20px 24px;
+      backdrop-filter: blur(12px);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transition: border-color 0.5s, color 0.5s;
+    }
+
+    /* ── Emotion history pills ── */
+    .history-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 16px 20px;
+      backdrop-filter: blur(12px);
+    }
+    .history-card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #a29bfe;
+      margin-bottom: 12px;
+    }
+    .pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      transition: all 0.3s;
+    }
+    .pill.active {
+      transform: scale(1.08);
+      border-color: transparent;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 30px;
+      font-size: 0.78rem;
+      color: #636e72;
+      text-align: center;
+    }
+    footer span { color: #fd79a8; }
+
+    /* ── Pulse animation for emotion label ── */
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50%       { transform: scale(1.05); }
+    }
+    .pulse { animation: pulse 1.2s ease-in-out; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeIn 0.4s ease forwards; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Ayan's Emotion Detector 💕</h1>
+    <p>Real-time facial expression recognition · Powered by ResNet18 + PyTorch</p>
+  </header>
+
+  <div class="main">
+
+    <!-- Camera feed -->
+    <div class="camera-card">
+      <img id="camFeed" src="/video_feed" alt="Live Camera" />
+      <div class="cam-label">📷 Live Camera</div>
+    </div>
+
+    <!-- Info panel -->
+    <div class="info-panel">
+
+      <!-- Current emotion -->
+      <div class="emotion-card" id="emotionCard">
+        <span class="emotion-emoji" id="emotionEmoji">😊</span>
+        <div class="emotion-label" id="emotionLabel">Detecting...</div>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar" id="confBar"></div>
+        </div>
+        <div class="confidence-text" id="confText">0% confidence</div>
+      </div>
+
+      <!-- Message -->
+      <div class="message-card" id="messageCard">
+        ✨ Stand in front of the camera and let me see your beautiful expression!
+      </div>
+
+      <!-- History -->
+      <div class="history-card">
+        <h3>Emotions Detected</h3>
+        <div class="pills" id="pills">
+          <span class="pill" data-emotion="Angry"    style="color:#FF4757">😤 Angry</span>
+          <span class="pill" data-emotion="Disgust"  style="color:#FF6B81">🤢 Disgust</span>
+          <span class="pill" data-emotion="Fear"     style="color:#A29BFE">😨 Fear</span>
+          <span class="pill" data-emotion="Happy"    style="color:#00B894">😊 Happy</span>
+          <span class="pill" data-emotion="Sad"      style="color:#74B9FF">😢 Sad</span>
+          <span class="pill" data-emotion="Surprise" style="color:#FDCB6E">😲 Surprise</span>
+          <span class="pill" data-emotion="Neutral"  style="color:#FD79A8">😌 Neutral</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    Made with <span>♥</span> by Ayan · CNN Transfer Learning · PyTorch
+  </footer>
+
+  <script>
+    const EMOJIS = {
+      Angry:    '😤',
+      Disgust:  '🤢',
+      Fear:     '😨',
+      Happy:    '😊',
+      Sad:      '🥺',
+      Surprise: '😲',
+      Neutral:  '😌',
+    };
+
+    let lastEmotion = '';
+
+    async function poll() {
+      try {
+        const res  = await fetch('/emotion_data');
+        const data = await res.json();
+        const { label, confidence, message, color } = data;
+
+        // Update emoji
+        document.getElementById('emotionEmoji').textContent = EMOJIS[label] || '🙂';
+
+        // Update label with pulse if changed
+        const labelEl = document.getElementById('emotionLabel');
+        if (label !== lastEmotion) {
+          labelEl.classList.remove('pulse');
+          void labelEl.offsetWidth; // reflow
+          labelEl.classList.add('pulse');
+          lastEmotion = label;
+        }
+        labelEl.textContent  = label;
+        labelEl.style.color  = color;
+
+        // Confidence bar
+        document.getElementById('confBar').style.width      = confidence + '%';
+        document.getElementById('confBar').style.background = color;
+        document.getElementById('confText').textContent     = confidence + '% confidence';
+
+        // Message
+        const msgEl = document.getElementById('messageCard');
+        if (msgEl.textContent.trim() !== message) {
+          msgEl.classList.remove('fade-in');
+          void msgEl.offsetWidth;
+          msgEl.classList.add('fade-in');
+          msgEl.textContent = message;
+          msgEl.style.color = color;
+          msgEl.style.borderColor = color + '55';
+        }
+
+        // Card border
+        document.getElementById('emotionCard').style.borderColor = color + '66';
+
+        // Highlight active pill
+        document.querySelectorAll('.pill').forEach(p => {
+          if (p.dataset.emotion === label) {
+            p.classList.add('active');
+            p.style.background = color + '33';
+            p.style.borderColor = color;
+          } else {
+            p.classList.remove('active');
+            p.style.background = '';
+            p.style.borderColor = '';
+          }
+        });
+
+      } catch (_) { /* camera not ready yet */ }
+    }
+
+    // Poll every 600ms
+    setInterval(poll, 600);
+    poll();
+  </script>
+</body>
+</html>

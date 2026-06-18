@@ -1,0 +1,20 @@
+# Dataset — too large for GitHub
+data/
+
+# Virtual environment
+venv/
+
+# Trained model weights
+*.pth
+*.pt
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
