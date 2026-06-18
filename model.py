@@ -55,7 +55,7 @@ def load_model(path: str, device=None):
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = EmotionClassifier(pretrained=False)
-    state = torch.load(path, map_location=device)
+    state = torch.load(path, map_location=device, weights_only=True)
     model.load_state_dict(state)
     model.to(device)
     model.eval()
