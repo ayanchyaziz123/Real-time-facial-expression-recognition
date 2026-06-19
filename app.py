@@ -32,9 +32,6 @@ transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
-current_emotion = {'label': 'Neutral', 'confidence': 0.0}
-
-
 def predict_emotion(face_img_bgr):
     img = Image.fromarray(cv2.cvtColor(face_img_bgr, cv2.COLOR_BGR2RGB))
     tensor = transform(img).unsqueeze(0).to(DEVICE)
@@ -73,31 +70,21 @@ def predict():
 
     gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1,
-                                          minNeighbors=5, minSize=(50, 50))
+                                          minNeighbors=4, minSize=(30, 30))
 
     faces_out = []
+    label, conf = 'Neutral', 0.0
+
     if len(faces) > 0:
         x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
-        face_crop  = frame[y:y+h, x:x+w]
+        face_crop   = frame[y:y+h, x:x+w]
         label, conf = predict_emotion(face_crop)
-        current_emotion['label']      = label
-        current_emotion['confidence'] = conf
-        faces_out = [{'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h)}]
+        faces_out   = [{'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h)}]
 
-    label = current_emotion['label']
-    conf  = current_emotion['confidence']
     msg, color = EMOTION_MESSAGES.get(label, ('', '#a78bfa'))
-
     return jsonify(label=label, confidence=conf, faces=faces_out,
                    message=msg, color=color)
 
-
-@app.route('/emotion_data')
-def emotion_data():
-    label = current_emotion['label']
-    message, color = EMOTION_MESSAGES.get(label, ('', '#a78bfa'))
-    return jsonify(label=label, confidence=current_emotion['confidence'],
-                   message=message, color=color)
 
 
 if __name__ == '__main__':
