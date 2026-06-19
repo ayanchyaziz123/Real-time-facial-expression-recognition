@@ -12,7 +12,7 @@ from PIL import Image
 from model import build_model, load_model, EMOTIONS, EMOTION_MESSAGES
 
 app = FastAPI()
-templates = Jinja2Templates(directory='templates')
+templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), 'templates'))
 
 MODEL_PATH = 'emotion_model.pth'
 FACE_CASCADE = cv2.CascadeClassifier(
