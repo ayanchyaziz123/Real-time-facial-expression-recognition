@@ -377,39 +377,43 @@
 
     function loadMaleVoice() {
       const voices = window.speechSynthesis.getVoices();
-      const en     = voices.filter(v => v.lang.startsWith('en'));
-
-      // Priority: voices with "male" in name, then common male voice names
+      if (!voices.length) return;
+      const en = voices.filter(v => v.lang.startsWith('en'));
       maleVoice =
         en.find(v => /male/i.test(v.name))                          ||
         en.find(v => /\b(david|daniel|alex|fred|tom|james|john|mark|paul|aaron|arthur|oliver|rishi|thomas|moira)\b/i.test(v.name)) ||
         en.find(v => v.name.includes('Google UK English Male'))      ||
         en.find(v => v.name.includes('Microsoft David'))             ||
-        en[0]                                                        ||
-        voices[0]                                                    ||
-        null;
+        en[0] || voices[0] || null;
     }
 
+    // onvoiceschanged doesn't fire on iOS — poll until voices appear
     window.speechSynthesis.onvoiceschanged = loadMaleVoice;
-    loadMaleVoice();
+    (function pollVoices() {
+      loadMaleVoice();
+      if (!maleVoice) setTimeout(pollVoices, 250);
+    })();
 
     function speak(text) {
       if (!voiceOn || !window.speechSynthesis) return;
+      // iOS requires a small delay after cancel() otherwise speak() is ignored
       window.speechSynthesis.cancel();
-      const utter   = new SpeechSynthesisUtterance(stripEmoji(text));
-      if (maleVoice) utter.voice = maleVoice;
-      utter.rate   = 0.95;
-      utter.pitch  = 0.8;   // lower pitch = deeper/manlier
-      utter.volume = 1.0;
-      window.speechSynthesis.speak(utter);
+      setTimeout(() => {
+        const utter = new SpeechSynthesisUtterance(stripEmoji(text));
+        if (maleVoice) utter.voice = maleVoice;
+        utter.rate   = 0.95;
+        utter.pitch  = 0.8;
+        utter.volume = 1.0;
+        window.speechSynthesis.speak(utter);
+      }, 150);
     }
 
-    // Mobile browsers block speech until a user gesture — unlock on first touch/click
+    // iOS blocks speech until a user gesture — unlock on first touch/click
     let speechUnlocked = false;
     function unlockSpeech() {
       if (speechUnlocked || !window.speechSynthesis) return;
-      const silent = new SpeechSynthesisUtterance('');
-      silent.volume = 0;
+      const silent = new SpeechSynthesisUtterance(' ');
+      silent.volume = 0.01;
       window.speechSynthesis.speak(silent);
       speechUnlocked = true;
       document.removeEventListener('touchstart', unlockSpeech);
