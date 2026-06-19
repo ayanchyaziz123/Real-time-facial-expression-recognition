@@ -4,8 +4,7 @@ data/
 # Virtual environment
 venv/
 
-# Trained model weights
-*.pth
+# Trained model weights (emotion_model.pth is committed intentionally — 43 MB, under GitHub limit)
 *.pt
 
 # Python cache
