@@ -404,6 +404,20 @@
       window.speechSynthesis.speak(utter);
     }
 
+    // Mobile browsers block speech until a user gesture — unlock on first touch/click
+    let speechUnlocked = false;
+    function unlockSpeech() {
+      if (speechUnlocked || !window.speechSynthesis) return;
+      const silent = new SpeechSynthesisUtterance('');
+      silent.volume = 0;
+      window.speechSynthesis.speak(silent);
+      speechUnlocked = true;
+      document.removeEventListener('touchstart', unlockSpeech);
+      document.removeEventListener('click', unlockSpeech);
+    }
+    document.addEventListener('touchstart', unlockSpeech, { passive: true });
+    document.addEventListener('click', unlockSpeech);
+
     const muteBtn = document.getElementById('muteBtn');
     muteBtn.addEventListener('click', () => {
       voiceOn = !voiceOn;
