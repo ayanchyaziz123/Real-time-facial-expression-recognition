@@ -14,7 +14,8 @@ from model import build_model, load_model, EMOTIONS, EMOTION_MESSAGES
 app = FastAPI()
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), 'templates'))
 
-MODEL_PATH = 'emotion_model.pth'
+BASE_DIR   = os.path.dirname(__file__)
+MODEL_PATH = os.path.join(BASE_DIR, 'emotion_model.pth')
 FACE_CASCADE = cv2.CascadeClassifier(
     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 )
@@ -26,7 +27,7 @@ if os.path.exists(MODEL_PATH):
 else:
     model = build_model(pretrained=False).to(DEVICE)
     model.eval()
-    print('[!] No trained model found — running in demo mode')
+    print(f'[!] No trained model at {MODEL_PATH} — running in demo mode')
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
@@ -51,6 +52,15 @@ def predict_emotion(face_img_bgr):
     return EMOTIONS[idx.item()], round(conf.item() * 100, 1)
 
 
+@app.get('/health')
+async def health():
+    return {
+        'model_loaded': os.path.exists(MODEL_PATH),
+        'model_path': MODEL_PATH,
+        'device': str(DEVICE),
+    }
+
+
 @app.get('/', response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse(request=request, name='index.html')
@@ -70,24 +80,27 @@ async def predict(data: FrameData):
         img_bytes = base64.b64decode(frame_b64)
         nparr     = np.frombuffer(img_bytes, np.uint8)
         frame     = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    except Exception:
+        if frame is None:
+            raise ValueError('imdecode returned None')
+    except Exception as e:
+        print(f'[predict] decode error: {e}')
         return {'label': 'Neutral', 'confidence': 0, 'faces': [], 'message': '', 'color': '#a78bfa'}
 
-    if frame is None:
+    try:
+        gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1,
+                                              minNeighbors=4, minSize=(30, 30))
+        faces_out = []
+        label, conf = 'Neutral', 0.0
+
+        if len(faces) > 0:
+            x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
+            face_crop   = frame[y:y+h, x:x+w]
+            label, conf = predict_emotion(face_crop)
+            faces_out   = [{'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h)}]
+    except Exception as e:
+        print(f'[predict] inference error: {e}')
         return {'label': 'Neutral', 'confidence': 0, 'faces': [], 'message': '', 'color': '#a78bfa'}
-
-    gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1,
-                                          minNeighbors=4, minSize=(30, 30))
-
-    faces_out = []
-    label, conf = 'Neutral', 0.0
-
-    if len(faces) > 0:
-        x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
-        face_crop   = frame[y:y+h, x:x+w]
-        label, conf = predict_emotion(face_crop)
-        faces_out   = [{'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h)}]
 
     msg, color = EMOTION_MESSAGES.get(label, ('', '#a78bfa'))
     return {'label': label, 'confidence': conf, 'faces': faces_out, 'message': msg, 'color': color}
