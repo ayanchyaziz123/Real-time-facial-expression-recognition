@@ -432,20 +432,22 @@
     async function processFrame() {
       if (!cameraReady || video.readyState < 2) return;
 
-      // Capture frame (mirrored to match what user sees)
+      // Capture frame at reduced resolution to save server memory
+      const MAX_W = 320;
+      const scale = Math.min(1, MAX_W / video.videoWidth);
       const cap = document.createElement('canvas');
-      cap.width  = video.videoWidth;
-      cap.height = video.videoHeight;
+      cap.width  = Math.round(video.videoWidth  * scale);
+      cap.height = Math.round(video.videoHeight * scale);
       const capCtx = cap.getContext('2d');
       capCtx.translate(cap.width, 0);
       capCtx.scale(-1, 1);
-      capCtx.drawImage(video, 0, 0);
+      capCtx.drawImage(video, 0, 0, cap.width, cap.height);
 
       try {
         const res  = await fetch('/predict', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ frame: cap.toDataURL('image/jpeg', 0.7) }),
+          body:    JSON.stringify({ frame: cap.toDataURL('image/jpeg', 0.5) }),
         });
         const data = await res.json();
         updateUI(data);

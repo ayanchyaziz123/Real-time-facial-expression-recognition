@@ -20,6 +20,7 @@ FACE_CASCADE = cv2.CascadeClassifier(
     cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
 )
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.set_num_threads(1)
 
 if os.path.exists(MODEL_PATH):
     model, DEVICE = load_model(MODEL_PATH, DEVICE)
