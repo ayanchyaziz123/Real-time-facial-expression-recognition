@@ -3,12 +3,16 @@ import base64
 import cv2
 import torch
 import numpy as np
-from flask import Flask, render_template, jsonify, request
+from fastapi import FastAPI, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 from torchvision import transforms
 from PIL import Image
 from model import build_model, load_model, EMOTIONS, EMOTION_MESSAGES
 
-app = Flask(__name__)
+app = FastAPI()
+templates = Jinja2Templates(directory='templates')
 
 MODEL_PATH = 'emotion_model.pth'
 FACE_CASCADE = cv2.CascadeClassifier(
@@ -32,6 +36,11 @@ transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
+
+class FrameData(BaseModel):
+    frame: str = ''
+
+
 def predict_emotion(face_img_bgr):
     img = Image.fromarray(cv2.cvtColor(face_img_bgr, cv2.COLOR_BGR2RGB))
     tensor = transform(img).unsqueeze(0).to(DEVICE)
@@ -42,18 +51,17 @@ def predict_emotion(face_img_bgr):
     return EMOTIONS[idx.item()], round(conf.item() * 100, 1)
 
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+@app.get('/', response_class=HTMLResponse)
+async def index(request: Request):
+    return templates.TemplateResponse(request=request, name='index.html')
 
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    data     = request.get_json(silent=True) or {}
-    frame_b64 = data.get('frame', '')
+@app.post('/predict')
+async def predict(data: FrameData):
+    frame_b64 = data.frame
 
     if not frame_b64:
-        return jsonify(label='Neutral', confidence=0, faces=[], message='', color='#a78bfa')
+        return {'label': 'Neutral', 'confidence': 0, 'faces': [], 'message': '', 'color': '#a78bfa'}
 
     if ',' in frame_b64:
         frame_b64 = frame_b64.split(',')[1]
@@ -63,10 +71,10 @@ def predict():
         nparr     = np.frombuffer(img_bytes, np.uint8)
         frame     = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     except Exception:
-        return jsonify(label='Neutral', confidence=0, faces=[], message='', color='#a78bfa')
+        return {'label': 'Neutral', 'confidence': 0, 'faces': [], 'message': '', 'color': '#a78bfa'}
 
     if frame is None:
-        return jsonify(label='Neutral', confidence=0, faces=[], message='', color='#a78bfa')
+        return {'label': 'Neutral', 'confidence': 0, 'faces': [], 'message': '', 'color': '#a78bfa'}
 
     gray  = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = FACE_CASCADE.detectMultiScale(gray, scaleFactor=1.1,
@@ -82,11 +90,10 @@ def predict():
         faces_out   = [{'x': int(x), 'y': int(y), 'w': int(w), 'h': int(h)}]
 
     msg, color = EMOTION_MESSAGES.get(label, ('', '#a78bfa'))
-    return jsonify(label=label, confidence=conf, faces=faces_out,
-                   message=msg, color=color)
-
+    return {'label': label, 'confidence': conf, 'faces': faces_out, 'message': msg, 'color': color}
 
 
 if __name__ == '__main__':
+    import uvicorn
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    uvicorn.run(app, host='0.0.0.0', port=port)
