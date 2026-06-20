@@ -374,16 +374,31 @@
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // iOS: use server-generated MP3 via Audio element (Web Speech API blocked on iOS)
-    let iosAudio = null;
+    // Single shared Audio element for iOS — reuse it so the gesture unlock persists
+    const iosAudio = new Audio();
+    iosAudio.preload = 'none';
+    let audioUnlocked = false;
+
+    function unlockAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      // Play a tiny silent data-URI to activate this Audio element via gesture
+      iosAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+      const p = iosAudio.play();
+      if (p) p.then(() => iosAudio.pause()).catch(() => {});
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('click',      unlockAudio);
+    }
+    document.addEventListener('touchstart', unlockAudio, { passive: true });
+    document.addEventListener('click',      unlockAudio);
 
     function speakIOS(emotion) {
-      if (iosAudio) { iosAudio.pause(); iosAudio = null; }
-      iosAudio = new Audio('/audio/' + encodeURIComponent(emotion));
-      iosAudio.play().catch(() => {});
+      iosAudio.pause();
+      iosAudio.src = '/audio/' + encodeURIComponent(emotion);
+      iosAudio.play().catch(e => console.warn('iOS audio:', e));
     }
 
-    // Desktop: use Web Speech API
+    // Desktop: Web Speech API
     let maleVoice = null;
 
     function loadMaleVoice() {
@@ -409,8 +424,8 @@
       if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(stripEmoji(text));
       if (maleVoice) utter.voice = maleVoice;
-      utter.rate   = 0.95;
-      utter.pitch  = 0.8;
+      utter.rate = 0.95;
+      utter.pitch = 0.8;
       utter.volume = 1.0;
       window.speechSynthesis.speak(utter);
     }
@@ -427,7 +442,7 @@
       muteBtn.textContent = voiceOn ? '🔊 Voice On' : '🔇 Voice Off';
       muteBtn.style.opacity = voiceOn ? '1' : '0.5';
       if (!voiceOn) {
-        if (iosAudio) { iosAudio.pause(); iosAudio = null; }
+        iosAudio.pause();
         if (window.speechSynthesis) window.speechSynthesis.cancel();
       }
     });
