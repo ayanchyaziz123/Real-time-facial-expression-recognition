@@ -372,10 +372,13 @@
       return text.replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}]/gu, '').trim();
     }
 
-    // Pick the best available male English voice
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+    // Pick the best available male English voice (skip on iOS — custom voices fail silently)
     let maleVoice = null;
 
     function loadMaleVoice() {
+      if (isIOS) return;
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
       const en = voices.filter(v => v.lang.startsWith('en'));
@@ -387,34 +390,38 @@
         en[0] || voices[0] || null;
     }
 
-    // onvoiceschanged doesn't fire on iOS — poll until voices appear
     window.speechSynthesis.onvoiceschanged = loadMaleVoice;
     (function pollVoices() {
       loadMaleVoice();
-      if (!maleVoice) setTimeout(pollVoices, 250);
+      if (!maleVoice && !isIOS) setTimeout(pollVoices, 250);
     })();
+
+    // iOS pauses speechSynthesis when idle — keep it alive
+    setInterval(() => {
+      if (window.speechSynthesis && window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+    }, 5000);
 
     function speak(text) {
       if (!voiceOn || !window.speechSynthesis) return;
-      // iOS requires a small delay after cancel() otherwise speak() is ignored
-      window.speechSynthesis.cancel();
-      setTimeout(() => {
-        const utter = new SpeechSynthesisUtterance(stripEmoji(text));
-        if (maleVoice) utter.voice = maleVoice;
-        utter.rate   = 0.95;
-        utter.pitch  = 0.8;
-        utter.volume = 1.0;
-        window.speechSynthesis.speak(utter);
-      }, 150);
+      // Only cancel if already speaking — calling cancel() on iOS resets the unlock
+      if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(stripEmoji(text));
+      if (maleVoice) utter.voice = maleVoice;
+      utter.rate   = 0.95;
+      utter.pitch  = isIOS ? 1.0 : 0.8;
+      utter.volume = 1.0;
+      window.speechSynthesis.speak(utter);
     }
 
     // iOS blocks speech until a user gesture — unlock on first touch/click
     let speechUnlocked = false;
     function unlockSpeech() {
       if (speechUnlocked || !window.speechSynthesis) return;
-      const silent = new SpeechSynthesisUtterance(' ');
-      silent.volume = 0.01;
-      window.speechSynthesis.speak(silent);
+      const utter = new SpeechSynthesisUtterance(' ');
+      utter.volume = 0.001;
+      window.speechSynthesis.speak(utter);
       speechUnlocked = true;
       document.removeEventListener('touchstart', unlockSpeech);
       document.removeEventListener('click', unlockSpeech);
