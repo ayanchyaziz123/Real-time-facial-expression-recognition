@@ -2,6 +2,7 @@
 torch==2.1.0+cpu
 torchvision==0.16.0+cpu
 fastapi>=0.110.0
+gtts>=2.3.0
 uvicorn>=0.27.0
 gunicorn>=21.2.0
 jinja2>=3.1.0

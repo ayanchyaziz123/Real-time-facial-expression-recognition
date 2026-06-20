@@ -1,11 +1,13 @@
 import os
+import re
 import base64
+import tempfile
 import cv2
 import torch
 import numpy as np
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 from torchvision import transforms
 from PIL import Image
@@ -38,6 +40,27 @@ transform = transforms.Compose([
                          std=[0.229, 0.224, 0.225]),
 ])
 
+# Pre-generate MP3 files for each emotion message (used for iOS audio)
+_audio_cache = {}
+_audio_dir   = tempfile.mkdtemp()
+
+def _get_audio(emotion):
+    if emotion in _audio_cache:
+        return _audio_cache[emotion]
+    msg, _ = EMOTION_MESSAGES.get(emotion, ('', ''))
+    if not msg:
+        return None
+    clean = re.sub(r'[^\w\s.,!?\'-]', '', msg).strip()
+    try:
+        from gtts import gTTS
+        path = os.path.join(_audio_dir, f'{emotion}.mp3')
+        gTTS(text=clean, lang='en').save(path)
+        _audio_cache[emotion] = path
+        return path
+    except Exception as e:
+        print(f'[tts] gTTS failed for {emotion}: {e}')
+        return None
+
 
 class FrameData(BaseModel):
     frame: str = ''
@@ -60,6 +83,14 @@ async def health():
         'model_path': MODEL_PATH,
         'device': str(DEVICE),
     }
+
+
+@app.get('/audio/{emotion}')
+async def audio(emotion: str):
+    path = _get_audio(emotion)
+    if path and os.path.exists(path):
+        return FileResponse(path, media_type='audio/mpeg')
+    return {'error': 'no audio'}
 
 
 @app.get('/', response_class=HTMLResponse)

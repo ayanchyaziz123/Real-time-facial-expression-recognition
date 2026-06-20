@@ -374,11 +374,19 @@
 
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    // Pick the best available male English voice (skip on iOS — custom voices fail silently)
+    // iOS: use server-generated MP3 via Audio element (Web Speech API blocked on iOS)
+    let iosAudio = null;
+
+    function speakIOS(emotion) {
+      if (iosAudio) { iosAudio.pause(); iosAudio = null; }
+      iosAudio = new Audio('/audio/' + encodeURIComponent(emotion));
+      iosAudio.play().catch(() => {});
+    }
+
+    // Desktop: use Web Speech API
     let maleVoice = null;
 
     function loadMaleVoice() {
-      if (isIOS) return;
       const voices = window.speechSynthesis.getVoices();
       if (!voices.length) return;
       const en = voices.filter(v => v.lang.startsWith('en'));
@@ -393,48 +401,35 @@
     window.speechSynthesis.onvoiceschanged = loadMaleVoice;
     (function pollVoices() {
       loadMaleVoice();
-      if (!maleVoice && !isIOS) setTimeout(pollVoices, 250);
+      if (!maleVoice) setTimeout(pollVoices, 250);
     })();
 
-    // iOS pauses speechSynthesis when idle — keep it alive
-    setInterval(() => {
-      if (window.speechSynthesis && window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-      }
-    }, 5000);
-
-    function speak(text) {
-      if (!voiceOn || !window.speechSynthesis) return;
-      // Only cancel if already speaking — calling cancel() on iOS resets the unlock
+    function speakDesktop(text) {
+      if (!window.speechSynthesis) return;
       if (window.speechSynthesis.speaking) window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(stripEmoji(text));
       if (maleVoice) utter.voice = maleVoice;
       utter.rate   = 0.95;
-      utter.pitch  = isIOS ? 1.0 : 0.8;
+      utter.pitch  = 0.8;
       utter.volume = 1.0;
       window.speechSynthesis.speak(utter);
     }
 
-    // iOS blocks speech until a user gesture — unlock on first touch/click
-    let speechUnlocked = false;
-    function unlockSpeech() {
-      if (speechUnlocked || !window.speechSynthesis) return;
-      const utter = new SpeechSynthesisUtterance(' ');
-      utter.volume = 0.001;
-      window.speechSynthesis.speak(utter);
-      speechUnlocked = true;
-      document.removeEventListener('touchstart', unlockSpeech);
-      document.removeEventListener('click', unlockSpeech);
+    function speak(text, emotion) {
+      if (!voiceOn) return;
+      if (isIOS) speakIOS(emotion);
+      else speakDesktop(text);
     }
-    document.addEventListener('touchstart', unlockSpeech, { passive: true });
-    document.addEventListener('click', unlockSpeech);
 
     const muteBtn = document.getElementById('muteBtn');
     muteBtn.addEventListener('click', () => {
       voiceOn = !voiceOn;
       muteBtn.textContent = voiceOn ? '🔊 Voice On' : '🔇 Voice Off';
       muteBtn.style.opacity = voiceOn ? '1' : '0.5';
-      if (!voiceOn) window.speechSynthesis.cancel();
+      if (!voiceOn) {
+        if (iosAudio) { iosAudio.pause(); iosAudio = null; }
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+      }
     });
 
     // Start browser camera
@@ -517,7 +512,7 @@
         void labelEl.offsetWidth;
         labelEl.classList.add('pulse');
         lastEmotion = label;
-        if (message) speak(message);
+        if (message) speak(message, label);
       }
       labelEl.textContent = label;
       labelEl.style.color = color;
